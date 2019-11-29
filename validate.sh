@@ -25,7 +25,7 @@ while read p; do
 	TESTDIR=`mktemp -d -p $PWD --suffix=$STREAM`
 
 	wget $REPO/$DIR/$SHA -O $TESTDIR/$SHA
-	wget $REPO/$DIR/$STEAM -O $TESTDIR/$STREAM
+	wget $REPO/$DIR/$STREAM -O $TESTDIR/$STREAM
 
 	ffmpeg -c:v h264_v4l2m2m -i $TESTDIR/$STREAM -pix_fmt yuv420p -f rawvideo -y $TESTDIR/$STREAM.raw
 
