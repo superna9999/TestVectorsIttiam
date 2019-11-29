@@ -45,7 +45,7 @@ while read p; do
 		fi
 	fi
 
-	gst-launch-1.0 filesrc location=$TESTDIR/$STREAM  ! parsebin ! $DEC ! videoconvert n-threads=8 ! 'video/x-raw, format=I420' ! filesink location=$TESTDIR/$STREAM.raw | tee $TESTDIR/log &
+	gst-launch-1.0 filesrc location=$TESTDIR/$STREAM  ! parsebin ! $DEC ! videoconvert n-threads=8 ! 'video/x-raw, format=I420' ! filesink location=$TESTDIR/$STREAM.raw &
 	PID=$!
 
 	( sleep 10 && kill $PID ) &
