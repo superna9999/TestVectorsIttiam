@@ -27,8 +27,25 @@ while read p; do
 	wget $REPO/$DIR/$SHA -O $TESTDIR/$SHA
 	wget $REPO/$DIR/$STREAM -O $TESTDIR/$STREAM
 
-	#ffmpeg -c:v h264_v4l2m2m -i $TESTDIR/$STREAM -pix_fmt yuv420p -f rawvideo -y $TESTDIR/$STREAM.raw
-	gst-launch-1.0 filesrc location=$TESTDIR/$STREAM  ! parsebin ! v4l2h264dec ! videoconvert n-threads=8 ! 'video/x-raw, format=I420' ! filesink location=$TESTDIR/$STREAM.raw | tee $TESTDIR/log &
+	if echo $STREAM | grep -c "mp4" ; then
+		if gst-inspect-1.0 | grep v4l2h264dec ; then
+			DEC=v4l2h264dec
+		elif gst-inspect-1.0 | grep vaapidecodebin && gst-inspect-1.0 vaapidecodebin | grep -c video/x-h264 ; then
+			DEC=vaapidecodebin
+		else
+			DEC=avdec_h264
+		fi
+	elif echo $STREAM | grep -c "webm" ; then
+		if gst-inspect-1.0 | grep v4l2h264dec ; then
+			DEC=v4l2vp9dec
+		elif gst-inspect-1.0 | grep vaapidecodebin && gst-inspect-1.0 vaapidecodebin | grep -c video/x-vp9 ; then
+			DEC=vaapidecodebin
+		else
+			DEC=avdec_h264
+		fi
+	fi
+
+	gst-launch-1.0 filesrc location=$TESTDIR/$STREAM  ! parsebin ! $DEC ! videoconvert n-threads=8 ! 'video/x-raw, format=I420' ! filesink location=$TESTDIR/$STREAM.raw | tee $TESTDIR/log &
 	PID=$!
 
 	( sleep 10 && kill $PID ) &
@@ -43,7 +60,7 @@ while read p; do
 		rm $TESTDIR/$STREAM $TESTDIR/$STREAM.raw
 	elif diff -q $TESTDIR/$SHA $TESTDIR/$STREAM.raw.sha256 ; then
 		echo "$p	OK" >> report.txt
-		rm $TESTDIR
+		rm -fr $TESTDIR
 	else
 		echo "$p	FAIL ($TESTDIR)" >> report.txt
 		rm $TESTDIR/$STREAM $TESTDIR/$STREAM.raw
