@@ -25,7 +25,7 @@ while read p; do
 	TESTDIR=`mktemp -d -p $PWD`
 
 	wget $REPO/$DIR/$SHA -O $TESTDIR/$SHA
-	wget $REPO/$DIR/$STEAM -O $TESTDIR/$STREAM
+	wget $REPO/$DIR/$STREAM -O $TESTDIR/$STREAM
 
 	if echo $STREAM | grep -c "mp4" ; then
 		if gst-inspect-1.0 | grep v4l2h264dec ; then
