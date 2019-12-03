@@ -1,21 +1,26 @@
-#!/bin/bash
+#!/bin/sh
 
 set -x
 
 if [ $# -lt 2 ]; then
-	echo "Usage: $0 <download base url> <tests>"
+	echo "Usage: $0 <download base url> <[tests] on repo or [tests].local for local file>"
 	exit 1
 fi
 
-TMP=`mktemp -d -p $PWD`
+TMP="`mktemp -d -p $PWD`"
 REPO=$1
 TESTS=$2
 
+if echo $TESTS | grep -c ".local" ; then
+	cp $TESTS $TMP/tests
+fi
+
 cd $TMP
 
-touch report.txt
+REPORT_FILE="report-`uname -n`.csv"
+echo "Test;Result;Temp Dir" > $REPORT_FILE
 
-wget $REPO/$TESTS -O tests
+[ -e tests ] || wget $REPO/$TESTS -O tests
 
 while read p; do
 	DIR=`dirname $p`
@@ -45,30 +50,36 @@ while read p; do
 		fi
 	fi
 
-	gst-launch-1.0 filesrc location=$TESTDIR/$STREAM  ! parsebin ! $DEC ! videoconvert n-threads=8 ! 'video/x-raw, format=I420' ! filesink location=$TESTDIR/$STREAM.raw &
+	GST_DEBUG_DUMP_DOT_DIR=$TESTDIR GST_DEBUG=4 gst-launch-1.0 filesrc location=$TESTDIR/$STREAM  ! parsebin ! $DEC ! videoconvert n-threads=8 ! 'video/x-raw, format=I420' ! filesink location=$TESTDIR/$STREAM.raw 2> $TESTDIR/log &
 	PID=$!
 
-	( sleep 10 && kill $PID ) &
+	(
+		sleep 30
+		[ -e $TESTDIR/done ] || kill $PID
+	) &
 
 	TIMEOUT=0
-	wait $PID || TIMEOUT=1
+	if wait $PID ; then
+		touch $TESTDIR/done
+	else
+		TIMEOUT=1
+	fi
 
 	[ -e $TESTDIR/$STREAM.raw ] && cat $TESTDIR/$STREAM.raw | sha256sum > $TESTDIR/$STREAM.raw.sha256
 
 	if [ "$TIMEOUT" = "1" ] ; then
-		echo "$p	TIMEOUT ($TESTDIR)" >> report.txt
+		echo "$p;TIMEOUT;`basename $TESTDIR`" >> $REPORT_FILE
 		rm $TESTDIR/$STREAM $TESTDIR/$STREAM.raw
 	elif diff -q $TESTDIR/$SHA $TESTDIR/$STREAM.raw.sha256 ; then
-		echo "$p	OK" >> report.txt
+		echo "$p;OK;" >> $REPORT_FILE
 		rm -fr $TESTDIR
 	else
-		echo "$p	FAIL ($TESTDIR)" >> report.txt
-		rm $TESTDIR/$STREAM $TESTDIR/$STREAM.raw
+		echo "$p;FAIL;`basename $TESTDIR`" >> $REPORT_FILE
 	fi
 done < tests
 
-cd -
+cat $REPORT_FILE
 
-cat $TMP/report.txt
+cd -
 
 exit 0
